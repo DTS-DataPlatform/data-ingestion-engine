@@ -1,0 +1,4 @@
+customer-id,full name,age(years),email@address,city.name
+C001,Nguyen An,20,an@gmail.com,Da Nang
+C002,Tran Binh,21,binh@gmail.com,Hue
+C003,Le Chi,22,chi@gmail.com,Hanoi
