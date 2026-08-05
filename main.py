@@ -1,13 +1,23 @@
 from app.ingestion.service import ingest_file
 
 
-dataset, df = ingest_file("tests/sample.csv")
+files = [
+    "storage/data/data.csv",
+    "storage/data/data.xlsx",
+    "storage/data/data.json",
+    "storage/data/test_data.parquet"
+]
 
-print(dataset)
+for file in files:
 
-print("\nDATA:")
-print(df)
+    dataset, table = ingest_file(
+        file,
+        sheet_name="Data"
+    )
 
-print("\nSCHEMA:")
-for column in dataset.schema:
-    print(column)
+    print("=" * 50)
+
+    print("FILE:", dataset.file_name)
+    print("TYPE:", dataset.file_type)
+    print("ROWS:", table.rows)
+    print("COLUMNS:", table.columns)
