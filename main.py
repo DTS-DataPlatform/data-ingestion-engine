@@ -6,6 +6,12 @@ from app.detection.rule_detector import (
 from app.detection.statistical_detector import (
     detect_iqr_anomalies
 )
+from app.anomaly.hybrid_detector import (
+    detect_hybrid_anomalies
+)
+from app.anomaly.aggregator import aggregate_anomalies
+from app.anomaly.deduplicator import ( deduplicate_anomalies )
+
 import pandas as pd
 
 
@@ -35,31 +41,106 @@ statistical_anomalies = detect_iqr_anomalies(
     dataset_profile.column_profiles
 )
 
-print("Rows:", dataset_profile.rows)
-print("Columns:", dataset_profile.columns)
+hybrid_anomalies = detect_hybrid_anomalies(
+    anomalies,
+    statistical_anomalies
+)
+
+# ==========================================
+# COMBINE ALL DETECTIONS
+# ==========================================
+
+all_anomalies = (
+    anomalies
+    + statistical_anomalies
+    + hybrid_anomalies
+)
+
+# ==========================================
+# DEDUPLICATION
+# ==========================================
+
+final_anomalies = deduplicate_anomalies(
+    all_anomalies
+)
+
+# ==========================================
+# ANOMALY DEDUPLICATION
+# ==========================================
 
 
-# print("\nCOLUMN PROFILES:")
 
-# for profile in dataset_profile.column_profiles:
-
-#     print(profile)
-
-
-# print("\nCORRELATION:")
+# print("\n")
+# print("=" * 60)
+# print("FINAL ANOMALIES")
+# print("=" * 60)
 
 # print(
-#     dataset_profile.correlation
+#     f"Total final anomalies: "
+#     f"{len(final_anomalies)}"
 # )
 
-# print("\nRULE ANOMALIES:")
 
-# for anomaly in anomalies:
+# for anomaly in final_anomalies:
 
-#     print(anomaly)
-    
-print("\nSTATISTICAL ANOMALIES:")
+#     print("\n")
 
-for anomaly in statistical_anomalies:
+#     print(
+#         f"Row: "
+#         f"{anomaly['row_index']}"
+#     )
 
-    print(anomaly)
+#     print(
+#         f"Column: "
+#         f"{anomaly['column']}"
+#     )
+
+#     print(
+#         f"Value: "
+#         f"{anomaly['value']}"
+#     )
+
+#     print(
+#         f"Type: "
+#         f"{anomaly['anomaly_types']}"
+#     )
+
+#     print(
+#         f"Detectors: "
+#         f"{anomaly['detectors']}"
+#     )
+
+#     print(
+#         f"Methods: "
+#         f"{anomaly['methods']}"
+#     )
+
+#     print(
+#         f"Score: "
+#         f"{anomaly['score']:.3f}"
+#     )
+
+#     print(
+#         f"Severity: "
+#         f"{anomaly['severity']}"
+#     )
+
+#     print(
+#         f"Detection count: "
+#         f"{anomaly['detection_count']}"
+#     )
+
+#     print(
+#         "Reasons:"
+#     )
+
+#     for reason in anomaly["reasons"]:
+
+#         print(
+#             f"  - {reason}"
+#         )
+
+print(f"RULE: {len(anomalies)}")
+print(f"STATISTICAL: {len(statistical_anomalies)}")
+print(f"HYBRID: {len(hybrid_anomalies)}")
+print(f"FINAL: {len(final_anomalies)}")
