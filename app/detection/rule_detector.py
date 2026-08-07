@@ -2,6 +2,10 @@ import pandas as pd
 
 from .models import AnomalyRecord
 from .rule_registry import RULES
+from app.anomaly.scoring import (
+    calculate_rule_score,
+    calculate_severity,
+)
 
 
 def detect_rule_anomalies(
@@ -16,14 +20,7 @@ def detect_rule_anomalies(
         semantic_type = profile.semantic_type
 
         # ==========================================
-        # Không có semantic type
-        # ==========================================
-
-        if semantic_type is None:
-            continue
-
-        # ==========================================
-        # Không có rule tương ứng
+        # No rule
         # ==========================================
 
         if semantic_type not in RULES:
@@ -31,22 +28,14 @@ def detect_rule_anomalies(
 
         rules = RULES[semantic_type]
 
-        # ==========================================
-        # Convert sang numeric
-        # ==========================================
-
         series = pd.to_numeric(
             df[profile.name],
             errors="coerce"
         )
 
-        # ==========================================
-        # Duyệt từng giá trị
-        # ==========================================
-
         for index, value in series.items():
 
-            # Bỏ qua missing / không convert được
+            # Ignore missing / invalid conversion
             if pd.isna(value):
                 continue
 
@@ -59,25 +48,37 @@ def detect_rule_anomalies(
                 and value < rules["min"]
             ):
 
+                score = calculate_rule_score(
+                    value=value,
+                    rules=rules,
+                )
+
+                severity = calculate_severity(
+                    score
+                )
+
                 anomalies.append(
                     AnomalyRecord(
                         row_index=int(index),
+
                         column=profile.name,
-                        value=value,
+
+                        value=float(value),
 
                         anomaly_type="invalid_value",
 
                         detector="rule",
 
-                        score=1.0,
+                        score=float(score),
 
                         method="min_rule",
 
-                        severity="high",
+                        severity=severity,
 
                         reason=(
                             f"{semantic_type} "
-                            f"must be >= {rules['min']}"
+                            f"must be >= "
+                            f"{rules['min']}"
                         ),
                     )
                 )
@@ -93,25 +94,37 @@ def detect_rule_anomalies(
                 and value > rules["max"]
             ):
 
+                score = calculate_rule_score(
+                    value=value,
+                    rules=rules,
+                )
+
+                severity = calculate_severity(
+                    score
+                )
+
                 anomalies.append(
                     AnomalyRecord(
                         row_index=int(index),
+
                         column=profile.name,
-                        value=value,
+
+                        value=float(value),
 
                         anomaly_type="invalid_value",
 
                         detector="rule",
 
-                        score=1.0,
+                        score=float(score),
 
                         method="max_rule",
 
-                        severity="high",
+                        severity=severity,
 
                         reason=(
                             f"{semantic_type} "
-                            f"must be <= {rules['max']}"
+                            f"must be <= "
+                            f"{rules['max']}"
                         ),
                     )
                 )
