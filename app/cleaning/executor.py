@@ -5,19 +5,6 @@ def execute_cleaning(
     dataframe: pd.DataFrame,
     recommendations: list,
 ) -> tuple[pd.DataFrame, list[dict]]:
-    """
-    Execute cleaning recommendations on a copy
-    of the original dataframe.
-
-    Supported actions:
-        - replace_with_missing
-        - review
-        - keep
-
-    Returns:
-        cleaned_dataframe
-        cleaning_log
-    """
 
     cleaned_df = dataframe.copy()
 
@@ -25,76 +12,112 @@ def execute_cleaning(
 
     for recommendation in recommendations:
 
-        row_index = recommendation.row_index
-        column = recommendation.column
-        value = recommendation.value
-        action = recommendation.action
+        # ======================================================
+        # GET RECOMMENDATION DATA
+        # ======================================================
 
-        # ==========================================
-        # SAFETY CHECK
-        # ==========================================
+        if isinstance(recommendation, dict):
 
-        if row_index not in cleaned_df.index:
-            cleaning_log.append(
-                {
-                    "row_index": row_index,
-                    "column": column,
-                    "old_value": value,
-                    "new_value": None,
-                    "action": action,
-                    "status": "skipped",
-                    "reason": "Row index does not exist",
-                }
+            row_index = recommendation.get("row_index")
+            column = recommendation.get("column")
+            action = recommendation.get("action")
+
+            reason = recommendation.get(
+                "reason",
+                "",
             )
 
-            continue
+            confidence = recommendation.get(
+                "confidence",
+                None,
+            )
+
+        else:
+
+            row_index = recommendation.row_index
+            column = recommendation.column
+            action = recommendation.action
+
+            reason = getattr(
+                recommendation,
+                "reason",
+                "",
+            )
+
+            confidence = getattr(
+                recommendation,
+                "confidence",
+                None,
+            )
+
+        # ======================================================
+        # COLUMN NOT FOUND
+        # ======================================================
 
         if column not in cleaned_df.columns:
+
             cleaning_log.append(
                 {
                     "row_index": row_index,
                     "column": column,
-                    "old_value": value,
-                    "new_value": None,
                     "action": action,
                     "status": "skipped",
-                    "reason": "Column does not exist",
+                    "reason": "Column not found.",
                 }
             )
 
             continue
 
-        # ==========================================
+        # ======================================================
+        # ROW NOT FOUND
+        # ======================================================
+
+        if row_index not in cleaned_df.index:
+
+            cleaning_log.append(
+                {
+                    "row_index": row_index,
+                    "column": column,
+                    "action": action,
+                    "status": "skipped",
+                    "reason": "Row not found.",
+                }
+            )
+
+            continue
+
+        # ======================================================
         # REPLACE WITH MISSING
-        # ==========================================
+        # ======================================================
 
         if action == "replace_with_missing":
 
-            old_value = cleaned_df.at[
+            original_value = cleaned_df.loc[
                 row_index,
-                column
+                column,
             ]
 
-            cleaned_df.at[
+            cleaned_df.loc[
                 row_index,
-                column
+                column,
             ] = pd.NA
 
             cleaning_log.append(
                 {
                     "row_index": row_index,
                     "column": column,
-                    "old_value": old_value,
-                    "new_value": pd.NA,
                     "action": action,
                     "status": "cleaned",
-                    "reason": recommendation.reason,
+                    "original_value": original_value,
+                    "new_value": None,
+                    "confidence": confidence,
+                    "reason": reason,
                 }
             )
 
-        # ==========================================
+        # ======================================================
         # REVIEW
-        # ==========================================
+        # ======================================================
 
         elif action == "review":
 
@@ -102,17 +125,20 @@ def execute_cleaning(
                 {
                     "row_index": row_index,
                     "column": column,
-                    "old_value": value,
-                    "new_value": value,
                     "action": action,
                     "status": "review_required",
-                    "reason": recommendation.reason,
+                    "original_value": cleaned_df.loc[
+                        row_index,
+                        column,
+                    ],
+                    "confidence": confidence,
+                    "reason": reason,
                 }
             )
 
-        # ==========================================
+        # ======================================================
         # KEEP
-        # ==========================================
+        # ======================================================
 
         elif action == "keep":
 
@@ -120,17 +146,20 @@ def execute_cleaning(
                 {
                     "row_index": row_index,
                     "column": column,
-                    "old_value": value,
-                    "new_value": value,
                     "action": action,
                     "status": "kept",
-                    "reason": recommendation.reason,
+                    "original_value": cleaned_df.loc[
+                        row_index,
+                        column,
+                    ],
+                    "confidence": confidence,
+                    "reason": reason,
                 }
             )
 
-        # ==========================================
+        # ======================================================
         # UNKNOWN ACTION
-        # ==========================================
+        # ======================================================
 
         else:
 
@@ -138,13 +167,10 @@ def execute_cleaning(
                 {
                     "row_index": row_index,
                     "column": column,
-                    "old_value": value,
-                    "new_value": value,
                     "action": action,
                     "status": "skipped",
                     "reason": (
-                        f"Unsupported cleaning action: "
-                        f"{action}"
+                        f"Unknown cleaning action: {action}"
                     ),
                 }
             )
