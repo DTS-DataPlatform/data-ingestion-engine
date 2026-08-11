@@ -111,7 +111,7 @@ def detect_isolation_forest_anomalies(
                 column="__row__",
                 value=values,
                 anomaly_type="multivariate_outlier",
-                detector="machine_learning",
+                detector="isolation_forest",
                 score=score,
                 method="IsolationForest",
                 severity=severity,

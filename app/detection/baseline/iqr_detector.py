@@ -97,7 +97,7 @@ def detect_iqr_anomalies(
                         column=profile.name,
                         value=float(value),
                         anomaly_type="outlier",
-                        detector="statistical",
+                        detector="iqr",
                         score=float(score),
                         method="IQR",
                         severity=severity,

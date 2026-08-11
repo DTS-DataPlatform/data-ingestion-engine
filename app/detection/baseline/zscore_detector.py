@@ -95,7 +95,7 @@ def detect_zscore_anomalies(
                     column=profile.name,
                     value=float(value),
                     anomaly_type="outlier",
-                    detector="statistical",
+                    detector="zscore",
                     score=float(absolute_z),
                     method="Z-score",
                     severity=severity,

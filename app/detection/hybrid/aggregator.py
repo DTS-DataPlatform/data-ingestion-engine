@@ -3,48 +3,73 @@ from collections import defaultdict
 from .models import HybridAnomalyRecord
 
 
+COLUMN_LEVEL_DETECTORS = {
+    "iqr",
+    "zscore",
+}
+
+MULTIVARIATE_DETECTORS = {
+    "isolation_forest",
+    "lof",
+    "dbscan",
+}
+
+
+def _normalize_detector_name(
+    detector: str,
+) -> str:
+
+    return detector.lower().strip()
+
+
+def _get_detection_scope(
+    detector: str,
+) -> str:
+
+    detector = _normalize_detector_name(
+        detector
+    )
+
+    if detector in COLUMN_LEVEL_DETECTORS:
+        return "column"
+
+    if detector in MULTIVARIATE_DETECTORS:
+        return "multivariate"
+
+    return "unknown"
+
+
 def aggregate_anomalies(
     anomalies,
     selected_detectors,
 ):
     """
-    Aggregate anomaly records produced by
-    multiple baseline detectors.
+    Aggregate anomaly records from all
+    selected detectors.
 
-    Parameters
-    ----------
-    anomalies:
-        Raw anomaly records produced by
-        baseline detectors.
-
-    selected_detectors:
-        Detectors that were actually executed.
-
-    Returns
-    -------
-    list[HybridAnomalyRecord]
+    Important:
+    total_detectors represents the total
+    number of selected detectors, not only
+    the detectors that produced an anomaly.
     """
 
     # ==========================================================
-    # 1. GROUP ANOMALIES
+    # 1. NORMALIZE SELECTED DETECTORS
     # ==========================================================
 
-    groups = defaultdict(list)
-
-    for anomaly in anomalies:
-
-        key = (
-            anomaly.row_index,
-            anomaly.column,
+    selected_detectors = [
+        _normalize_detector_name(
+            detector
         )
+        for detector in selected_detectors
+    ]
 
-        groups[key].append(
-            anomaly
+    # Remove duplicates but preserve order
+    selected_detectors = list(
+        dict.fromkeys(
+            selected_detectors
         )
-
-    # ==========================================================
-    # 2. TOTAL DETECTORS
-    # ==========================================================
+    )
 
     total_detectors = len(
         selected_detectors
@@ -54,23 +79,99 @@ def aggregate_anomalies(
         return []
 
     # ==========================================================
-    # 3. BUILD HYBRID RESULTS
+    # 2. GROUP ANOMALIES
+    # ==========================================================
+
+    groups = defaultdict(list)
+
+    for anomaly in anomalies:
+
+        detector = _normalize_detector_name(
+            anomaly.detector
+        )
+
+        scope = _get_detection_scope(
+            detector
+        )
+
+        # ------------------------------------------------------
+        # Column-level anomaly
+        # ------------------------------------------------------
+
+        if scope == "column":
+
+            key = (
+                "column",
+                anomaly.row_index,
+                anomaly.column,
+            )
+
+        # ------------------------------------------------------
+        # Multivariate anomaly
+        # ------------------------------------------------------
+
+        elif scope == "multivariate":
+
+            key = (
+                "multivariate",
+                anomaly.row_index,
+            )
+
+        else:
+
+            # Unknown detector:
+            # keep original location
+            key = (
+                "unknown",
+                anomaly.row_index,
+                anomaly.column,
+            )
+
+        groups[key].append(
+            anomaly
+        )
+
+    # ==========================================================
+    # 3. BUILD RESULTS
     # ==========================================================
 
     hybrid_results = []
 
-    for (
-        row_index,
-        column,
-    ), records in groups.items():
+    for key, records in groups.items():
 
-        # ------------------------------------------
-        # Unique detector names
-        # ------------------------------------------
+        scope = key[0]
+
+        # ------------------------------------------------------
+        # Location
+        # ------------------------------------------------------
+
+        if scope == "column":
+
+            row_index = key[1]
+
+            column = key[2]
+
+        elif scope == "multivariate":
+
+            row_index = key[1]
+
+            column = "__multivariate__"
+
+        else:
+
+            row_index = key[1]
+
+            column = key[2]
+
+        # ------------------------------------------------------
+        # Unique detectors
+        # ------------------------------------------------------
 
         detector_names = list(
             dict.fromkeys(
-                record.detector
+                _normalize_detector_name(
+                    record.detector
+                )
                 for record in records
             )
         )
@@ -79,24 +180,26 @@ def aggregate_anomalies(
             detector_names
         )
 
-        # ------------------------------------------
-        # Agreement ratio
-        # ------------------------------------------
+        # ------------------------------------------------------
+        # IMPORTANT
+        #
+        # denominator = ALL selected detectors
+        # ------------------------------------------------------
 
         agreement_ratio = (
             detector_count
             / total_detectors
         )
 
-        # ------------------------------------------
+        # ------------------------------------------------------
         # Confidence
-        # ------------------------------------------
+        # ------------------------------------------------------
 
         confidence = agreement_ratio
 
-        # ------------------------------------------
+        # ------------------------------------------------------
         # Severity
-        # ------------------------------------------
+        # ------------------------------------------------------
 
         if confidence >= 0.8:
 
@@ -114,15 +217,15 @@ def aggregate_anomalies(
 
             severity = "low"
 
-        # ------------------------------------------
+        # ------------------------------------------------------
         # Representative value
-        # ------------------------------------------
+        # ------------------------------------------------------
 
         value = records[0].value
 
-        # ------------------------------------------
+        # ------------------------------------------------------
         # Anomaly type
-        # ------------------------------------------
+        # ------------------------------------------------------
 
         anomaly_types = list(
             dict.fromkeys(
@@ -131,35 +234,66 @@ def aggregate_anomalies(
             )
         )
 
-        if len(anomaly_types) == 1:
+        if scope == "multivariate":
 
-            anomaly_type = (
-                anomaly_types[0]
+            if len(anomaly_types) == 1:
+
+                anomaly_type = (
+                    anomaly_types[0]
+                )
+
+            else:
+
+                anomaly_type = (
+                    "multidetector_outlier"
+                )
+
+            # --------------------------------------------------
+            # Multivariate explanation
+            # --------------------------------------------------
+
+            reason = (
+                f"Row detected as anomalous "
+                f"by {detector_count}/"
+                f"{total_detectors} "
+                f"selected multivariate "
+                f"detectors: "
+                f"{', '.join(detector_names)}. "
+                f"Agreement ratio="
+                f"{agreement_ratio:.2f}."
             )
 
         else:
 
-            anomaly_type = (
-                "multidetector_outlier"
+            if len(anomaly_types) == 1:
+
+                anomaly_type = (
+                    anomaly_types[0]
+                )
+
+            else:
+
+                anomaly_type = (
+                    "multidetector_outlier"
+                )
+
+            # --------------------------------------------------
+            # Column explanation
+            # --------------------------------------------------
+
+            reason = (
+                f"Detected by "
+                f"{detector_count}/"
+                f"{total_detectors} "
+                f"selected detectors: "
+                f"{', '.join(detector_names)}. "
+                f"Agreement ratio="
+                f"{agreement_ratio:.2f}."
             )
 
-        # ------------------------------------------
-        # Explanation
-        # ------------------------------------------
-
-        reason = (
-            f"Detected by "
-            f"{detector_count}/"
-            f"{total_detectors} "
-            f"selected detectors: "
-            f"{', '.join(detector_names)}. "
-            f"Agreement ratio="
-            f"{agreement_ratio:.2f}."
-        )
-
-        # ------------------------------------------
-        # Create record
-        # ------------------------------------------
+        # ------------------------------------------------------
+        # Create result
+        # ------------------------------------------------------
 
         hybrid_results.append(
             HybridAnomalyRecord(

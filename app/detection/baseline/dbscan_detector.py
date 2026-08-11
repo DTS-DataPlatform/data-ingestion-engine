@@ -86,7 +86,7 @@ def detect_dbscan_anomalies(
                     row_index
                 ].to_dict(),
                 anomaly_type="noise",
-                detector="clustering",
+                detector="dbscan",
                 score=1.0,
                 method="DBSCAN",
                 severity="medium",

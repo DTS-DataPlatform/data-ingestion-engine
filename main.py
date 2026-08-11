@@ -1,584 +1,471 @@
 import pandas as pd
 
-from app.core.table import UnifiedTable
-from app.pipeline.runner import run_pipeline
+from types import SimpleNamespace
+
+from app.profiling.column_profiler import profile_column
+
+from app.detection.baseline_runner import (
+    run_baseline_detection,
+)
+
+from app.detection.hybrid.aggregator import (
+    aggregate_anomalies,
+)
+
+from app.detection.hybrid.score_normalizer import (
+    normalize_detector_score,
+)
 
 
-def print_separator(title: str):
+# ==========================================================
+# PRINT HELPERS
+# ==========================================================
+
+def print_separator(title):
     print()
     print("=" * 70)
     print(title)
     print("=" * 70)
 
 
+def print_anomalies(anomalies):
+    if not anomalies:
+        print("No anomalies detected.")
+        return
+
+    for anomaly in anomalies:
+        print(
+            f"row={anomaly.row_index}, "
+            f"column={anomaly.column}, "
+            f"value={anomaly.value}, "
+            f"score={anomaly.score:.4f}, "
+            f"severity={anomaly.severity}"
+        )
+
+        print(
+            f"  method   : {anomaly.method}"
+        )
+
+        print(
+            f"  detector : {anomaly.detector}"
+        )
+
+        print(
+            f"  reason   : {anomaly.reason}"
+        )
+
+
+# ==========================================================
+# MAIN
+# ==========================================================
+
 def main():
 
-    # ==========================================================
-    # 1. CREATE SAMPLE DATASET
-    # ==========================================================
+    # ======================================================
+    # 1. CREATE DATASET
+    # ======================================================
 
     df = pd.DataFrame(
         {
-            "customer_id": [
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-            ],
+            "customer_id": list(range(1, 51)),
 
             "age": [
-                20,
-                25,
-                None,
-                30,
-                999,
-                35,
+                20, 21, 22, 23, 24,
+                25, 26, 27, 28, 29,
+                30, 31, 32, 33, 34,
+                35, 36, 37, 38, 39,
+                40, 41, 42, 43, 44,
+                45, 46, 47, 48, 49,
+                50, 51, 52, 53, 54,
+                55, 56, 57, 58, 59,
+                60, 61, 62, 63, 64,
+                65, 66, 67, 68, 999,
             ],
 
             "salary": [
-                10000000,
-                12000000,
-                None,
-                15000000,
-                100000000,
-                None,
+                10_000_000,
+                10_500_000,
+                11_000_000,
+                11_500_000,
+                12_000_000,
+                12_500_000,
+                13_000_000,
+                13_500_000,
+                14_000_000,
+                14_500_000,
+                15_000_000,
+                15_500_000,
+                16_000_000,
+                16_500_000,
+                17_000_000,
+                17_500_000,
+                18_000_000,
+                18_500_000,
+                19_000_000,
+                19_500_000,
+                20_000_000,
+                20_500_000,
+                21_000_000,
+                21_500_000,
+                22_000_000,
+                22_500_000,
+                23_000_000,
+                23_500_000,
+                24_000_000,
+                24_500_000,
+                25_000_000,
+                25_500_000,
+                26_000_000,
+                26_500_000,
+                27_000_000,
+                27_500_000,
+                28_000_000,
+                28_500_000,
+                29_000_000,
+                29_500_000,
+                30_000_000,
+                30_500_000,
+                31_000_000,
+                31_500_000,
+                32_000_000,
+                32_500_000,
+                33_000_000,
+                33_500_000,
+                34_000_000,
+                200_000_000,
             ],
 
-            "city": [
-                "Da Nang",
-                "Hue",
-                None,
-                "Da Nang",
-                "Da Nang",
-                None,
+            "experience": [
+                1, 2, 1, 3, 2,
+                4, 3, 5, 4, 6,
+                5, 7, 6, 8, 7,
+                9, 8, 10, 9, 11,
+                10, 12, 11, 13, 12,
+                14, 13, 15, 14, 16,
+                15, 17, 16, 18, 17,
+                19, 18, 20, 19, 21,
+                20, 22, 21, 23, 22,
+                24, 23, 25, 24, 30,
             ],
         }
     )
 
-    # ==========================================================
-    # 2. CREATE UNIFIED TABLE
-    # ==========================================================
-
-    table = UnifiedTable(
-        dataframe=df,
-        source_file="sample.csv",
-        file_type="csv",
-    )
-
-    # ==========================================================
-    # 3. ORIGINAL DATASET
-    # ==========================================================
+    # ======================================================
+    # 2. ORIGINAL DATASET
+    # ======================================================
 
     print_separator("ORIGINAL DATASET")
 
     print(df)
 
-    # ==========================================================
-    # 4. RUN PIPELINE
-    # ==========================================================
+    print()
+    print(f"Rows    : {len(df)}")
+    print(f"Columns : {len(df.columns)}")
 
-    result = run_pipeline(table)
+    # ======================================================
+    # 3. PROFILE
+    # ======================================================
 
-    # ==========================================================
-    # 5. DATASET PROFILE
-    # ==========================================================
+    print_separator("DATASET PROFILING")
 
-    print_separator("DATASET PROFILE")
+    profiles = []
 
-    profile = result.dataset_profile
+    for column in df.columns:
 
-    print(f"Rows    : {profile.rows}")
-    print(f"Columns : {profile.columns}")
+        profile = profile_column(
+            df[column]
+        )
 
-    for column_profile in profile.column_profiles:
+        profiles.append(profile)
+
+        print(
+            f"\nColumn: {column}"
+        )
+
+        print(
+            f"  dtype         : {profile.dtype}"
+        )
+
+        print(
+            f"  mean          : {profile.mean}"
+        )
+
+        print(
+            f"  missing_count : {profile.missing_count}"
+        )
+
+        print(
+            f"  unique_count  : {profile.unique_count}"
+        )
+
+    # ======================================================
+    # 4. DATASET CHARACTERISTICS
+    # ======================================================
+
+    numeric_columns = 0
+
+    for profile in profiles:
+
+        if profile.mean is not None:
+            numeric_columns += 1
+
+    characteristics = SimpleNamespace(
+        rows=len(df),
+        numeric_columns=numeric_columns,
+        skewed=False,
+    )
+
+    print_separator(
+        "DATASET CHARACTERISTICS"
+    )
+
+    print(
+        f"Rows             : "
+        f"{characteristics.rows}"
+    )
+
+    print(
+        f"Numeric columns  : "
+        f"{characteristics.numeric_columns}"
+    )
+
+    print(
+        f"Skewed           : "
+        f"{characteristics.skewed}"
+    )
+
+    # ======================================================
+    # 5. BASELINE DETECTION
+    # ======================================================
+
+    results = run_baseline_detection(
+        df,
+        profiles,
+        characteristics,
+    )
+
+    selected_detectors = results[
+        "selected_detectors"
+    ]
+
+    print_separator(
+        "SELECTED DETECTORS"
+    )
+
+    for detector in selected_detectors:
+
+        print(
+            f"- {detector}"
+        )
+
+    # ======================================================
+    # 6. PRINT EACH DETECTOR
+    # ======================================================
+
+    print_separator(
+        "BASELINE ANOMALY DETECTION"
+    )
+
+    raw_anomalies = []
+
+    for detector in selected_detectors:
+
+        anomalies = results.get(
+            detector,
+            []
+        )
 
         print()
         print(
-            f"Column: {column_profile.name}"
+            f"--- {detector.upper()} ---"
         )
 
         print(
-            f"  dtype           : "
-            f"{column_profile.dtype}"
+            f"Detected: {len(anomalies)}"
         )
 
+        print()
+
+        print_anomalies(
+            anomalies
+        )
+
+        raw_anomalies.extend(
+            anomalies
+        )
+
+    # ======================================================
+    # 7. NORMALIZED SCORES
+    # ======================================================
+
+    print_separator(
+        "NORMALIZED DETECTOR SCORES"
+    )
+
+    for detector in selected_detectors:
+
+        anomalies = results.get(
+            detector,
+            []
+        )
+
+        if not anomalies:
+            continue
+
+        print()
         print(
-            f"  semantic_type   : "
-            f"{column_profile.semantic_type}"
+            f"--- {detector.upper()} ---"
         )
 
-        print(
-            f"  missing_count   : "
-            f"{column_profile.missing_count}"
-        )
+        for anomaly in anomalies:
 
-        print(
-            f"  missing_ratio   : "
-            f"{column_profile.missing_ratio:.2%}"
-        )
+            # ------------------------------------------------
+            # DBSCAN does not use the same score scale
+            # as IQR / Z-score / LOF / Isolation Forest.
+            #
+            # Therefore skip it until a dedicated DBSCAN
+            # normalization function is implemented.
+            # ------------------------------------------------
 
-        print(
-            f"  unique_count    : "
-            f"{column_profile.unique_count}"
-        )
+            if detector == "dbscan":
 
-        print(
-            f"  numeric_ratio   : "
-            f"{column_profile.numeric_ratio:.2%}"
-        )
+                print(
+                    f"row={anomaly.row_index}, "
+                    f"raw_score={anomaly.score}, "
+                    f"normalized=N/A"
+                )
 
-        if column_profile.semantic_confidence:
+                continue
 
-            print(
-                f"  semantic_conf.  : "
-                f"{column_profile.semantic_confidence:.2f}"
+            normalized = (
+                normalize_detector_score(
+                    detector,
+                    anomaly.score,
+                )
             )
 
-    # ==========================================================
-    # 6. RULE ANOMALIES
-    # ==========================================================
+            print(
+                f"row={anomaly.row_index}, "
+                f"column={anomaly.column}, "
+                f"raw={anomaly.score:.4f}, "
+                f"normalized={normalized:.4f}"
+            )
 
-    print_separator("RULE ANOMALIES")
-
-    if result.rule_anomalies:
-
-        for anomaly in result.rule_anomalies:
-
-            print(anomaly)
-
-    else:
-
-        print("No rule anomalies detected.")
-
-    # ==========================================================
-    # 7. STATISTICAL ANOMALIES
-    # ==========================================================
+    # ======================================================
+    # 8. HYBRID AGGREGATION
+    # ======================================================
 
     print_separator(
-        "STATISTICAL ANOMALIES"
+        "HYBRID ANOMALY AGGREGATION"
     )
 
-    if result.statistical_anomalies:
+    hybrid_results = aggregate_anomalies(
+        raw_anomalies,
+        selected_detectors,
+    )
 
-        for anomaly in (
-            result.statistical_anomalies
-        ):
-
-            print(anomaly)
-
-    else:
+    if not hybrid_results:
 
         print(
-            "No statistical anomalies detected."
-        )
-
-    # ==========================================================
-    # 8. HYBRID ANOMALIES
-    # ==========================================================
-
-    print_separator(
-        "HYBRID ANOMALIES"
-    )
-
-    if result.anomalies:
-
-        for anomaly in result.anomalies:
-
-            print(anomaly)
-
-    else:
-
-        print("No anomalies detected.")
-
-    # ==========================================================
-    # 9. CLEANING RECOMMENDATIONS
-    # ==========================================================
-
-    print_separator(
-        "CLEANING RECOMMENDATIONS"
-    )
-
-    if result.cleaning_recommendations:
-
-        for recommendation in (
-            result.cleaning_recommendations
-        ):
-
-            print(recommendation)
-
-    else:
-
-        print(
-            "No cleaning recommendations."
-        )
-
-    # ==========================================================
-    # 10. CLEANING RESULTS
-    # ==========================================================
-
-    print_separator(
-        "CLEANING RESULTS"
-    )
-
-    cleaning_results = getattr(
-        result,
-        "cleaning_results",
-        getattr(
-            result,
-            "cleaning_logs",
-            [],
-        ),
-    )
-
-    if cleaning_results:
-
-        for item in cleaning_results:
-
-            print(item)
-
-    else:
-
-        print("No cleaning actions.")
-
-    # ==========================================================
-    # 11. IMPUTATION RECOMMENDATIONS
-    # ==========================================================
-
-    print_separator(
-        "IMPUTATION RECOMMENDATIONS"
-    )
-
-    if result.imputation_recommendations:
-
-        for recommendation in (
-            result.imputation_recommendations
-        ):
-
-            print(recommendation)
-
-    else:
-
-        print(
-            "No imputation recommendations."
-        )
-
-    # ==========================================================
-    # 12. IMPUTATION RESULTS
-    # ==========================================================
-
-    print_separator(
-        "IMPUTATION RESULTS"
-    )
-
-    imputation_results = getattr(
-        result,
-        "imputation_results",
-        getattr(
-            result,
-            "imputation_logs",
-            [],
-        ),
-    )
-
-    if imputation_results:
-
-        for item in imputation_results:
-
-            print(item)
-
-    else:
-
-        print("No imputation actions.")
-
-    # ==========================================================
-    # 13. FINAL CLEANED DATASET
-    # ==========================================================
-
-    print_separator(
-        "FINAL CLEANED DATASET"
-    )
-
-    final_df = getattr(
-        result,
-        "dataframe",
-        result.cleaned_dataframe,
-    )
-
-    print(final_df)
-
-    # ==========================================================
-    # 14. QUALITY REPORT
-    # ==========================================================
-
-    print_separator(
-        "QUALITY REPORT"
-    )
-
-    report = result.quality_report
-
-    print(
-        f"Rows              : "
-        f"{report.rows}"
-    )
-
-    print(
-        f"Columns           : "
-        f"{report.columns}"
-    )
-
-    print(
-        f"Total cells       : "
-        f"{report.total_cells}"
-    )
-
-    print(
-        f"Missing cells     : "
-        f"{report.missing_cells}"
-    )
-
-    print(
-        f"Missing ratio     : "
-        f"{report.missing_ratio:.2%}"
-    )
-
-    print(
-        f"Quality score     : "
-        f"{report.quality_score:.2f}"
-    )
-
-    print(
-        f"Total anomalies   : "
-        f"{report.total_anomalies}"
-    )
-
-    print(
-        f"Cleaned count     : "
-        f"{report.cleaned_count}"
-    )
-
-    print(
-        f"Review count      : "
-        f"{report.review_count}"
-    )
-
-    print(
-        f"Skipped count     : "
-        f"{report.skipped_count}"
-    )
-
-    print()
-
-    print("Severity counts:")
-
-    print(
-        report.severity_counts
-    )
-
-    print()
-
-    print("Issue counts:")
-
-    print(
-        report.issue_counts
-    )
-
-    print()
-
-    print("Column issues:")
-
-    for column, issues in (
-        report.column_issues.items()
-    ):
-
-        print(
-            f"  {column}: {issues}"
-        )
-
-    # ==========================================================
-    # 15. BEFORE / AFTER QUALITY EVALUATION
-    # ==========================================================
-
-    print_separator(
-        "QUALITY EVALUATION"
-    )
-
-    comparison = (
-        result.quality_comparison
-    )
-
-    if comparison is None:
-
-        print(
-            "Quality comparison is not available."
+            "No hybrid anomalies detected."
         )
 
     else:
 
-        before = comparison.before
-        after = comparison.after
+        for result in hybrid_results:
 
-        # ------------------------------------------------------
-        # BEFORE
-        # ------------------------------------------------------
+            print()
 
-        print("BEFORE")
+            print(
+                f"Row              : "
+                f"{result.row_index}"
+            )
 
-        print(
-            f"  Rows              : "
-            f"{before.rows}"
-        )
+            print(
+                f"Column           : "
+                f"{result.column}"
+            )
 
-        print(
-            f"  Columns           : "
-            f"{before.columns}"
-        )
+            print(
+                f"Value            : "
+                f"{result.value}"
+            )
 
-        print(
-            f"  Total cells       : "
-            f"{before.total_cells}"
-        )
+            print(
+                f"Detectors        : "
+                f"{result.detectors}"
+            )
 
-        print(
-            f"  Missing cells     : "
-            f"{before.missing_cells}"
-        )
+            print(
+                f"Detector count   : "
+                f"{result.detector_count}"
+            )
 
-        print(
-            f"  Missing ratio     : "
-            f"{before.missing_ratio:.2%}"
-        )
+            print(
+                f"Total detectors  : "
+                f"{result.total_detectors}"
+            )
 
-        print(
-            f"  Anomalies         : "
-            f"{before.anomaly_count}"
-        )
+            print(
+                f"Agreement ratio  : "
+                f"{result.agreement_ratio:.4f}"
+            )
 
-        print(
-            f"  Quality score     : "
-            f"{before.quality_score:.2f}"
-        )
+            print(
+                f"Confidence       : "
+                f"{result.confidence:.4f}"
+            )
 
-        # ------------------------------------------------------
-        # AFTER
-        # ------------------------------------------------------
+            print(
+                f"Anomaly type     : "
+                f"{result.anomaly_type}"
+            )
 
-        print()
-        print("AFTER")
+            print(
+                f"Severity         : "
+                f"{result.severity}"
+            )
 
-        print(
-            f"  Rows              : "
-            f"{after.rows}"
-        )
+            print(
+                f"Reason           : "
+                f"{result.reason}"
+            )
 
-        print(
-            f"  Columns           : "
-            f"{after.columns}"
-        )
-
-        print(
-            f"  Total cells       : "
-            f"{after.total_cells}"
-        )
-
-        print(
-            f"  Missing cells     : "
-            f"{after.missing_cells}"
-        )
-
-        print(
-            f"  Missing ratio     : "
-            f"{after.missing_ratio:.2%}"
-        )
-
-        print(
-            f"  Anomalies         : "
-            f"{after.anomaly_count}"
-        )
-
-        print(
-            f"  Quality score     : "
-            f"{after.quality_score:.2f}"
-        )
-
-        # ------------------------------------------------------
-        # IMPROVEMENT
-        # ------------------------------------------------------
-
-        print()
-        print("IMPROVEMENT")
-
-        print(
-            f"  Missing reduced       : "
-            f"{comparison.missing_reduction}"
-        )
-
-        print(
-            f"  Missing ratio reduced : "
-            f"{comparison.missing_ratio_reduction:.2%}"
-        )
-
-        print(
-            f"  Anomalies reduced     : "
-            f"{comparison.anomaly_reduction}"
-        )
-
-        print(
-            f"  Quality improvement   : "
-            f"{comparison.quality_score_improvement:+.2f}"
-        )
-
-        print(
-            f"  Quality improved      : "
-            f"{comparison.quality_improved}"
-        )
-
-    # ==========================================================
-    # 16. PIPELINE SUMMARY
-    # ==========================================================
+    # ======================================================
+    # 9. SUMMARY
+    # ======================================================
 
     print_separator(
         "PIPELINE SUMMARY"
     )
 
     print(
-        f"Original rows       : "
-        f"{len(df)}"
+        f"Rows               : {len(df)}"
     )
 
     print(
-        f"Final rows          : "
-        f"{len(final_df)}"
+        f"Columns            : {len(df.columns)}"
     )
 
     print(
-        f"Anomalies detected  : "
-        f"{len(result.anomalies)}"
+        f"Selected detectors : "
+        f"{len(selected_detectors)}"
     )
 
     print(
-        f"Cleaning actions    : "
-        f"{len(cleaning_results)}"
+        f"Raw anomalies      : "
+        f"{len(raw_anomalies)}"
     )
 
     print(
-        f"Imputation actions  : "
-        f"{len(imputation_results)}"
+        f"Hybrid anomalies   : "
+        f"{len(hybrid_results)}"
     )
 
-    print(
-        f"Quality score       : "
-        f"{report.quality_score:.2f}"
-    )
 
-    if comparison is not None:
-
-        print(
-            f"Quality improvement: "
-            f"{comparison.quality_score_improvement:+.2f}"
-        )
-
+# ==========================================================
+# ENTRY POINT
+# ==========================================================
 
 if __name__ == "__main__":
     main()
