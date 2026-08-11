@@ -5,13 +5,13 @@ from .models import QualityReport
 
 def build_quality_report(
     dataframe,
-    anomalies: list[dict],
+    anomalies: list,
     cleaning_results: list[dict],
 ) -> QualityReport:
 
-    # ==========================================
+    # ==========================================================
     # DATASET
-    # ==========================================
+    # ==========================================================
 
     rows = len(dataframe)
 
@@ -19,9 +19,9 @@ def build_quality_report(
 
     total_cells = rows * columns
 
-    # ==========================================
-    # MISSING
-    # ==========================================
+    # ==========================================================
+    # MISSING VALUES
+    # ==========================================================
 
     missing_cells = int(
         dataframe.isna().sum().sum()
@@ -37,54 +37,181 @@ def build_quality_report(
 
         missing_ratio = 0.0
 
-    # ==========================================
-    # QUALITY SCORE
-    # ==========================================
-
-    if total_cells > 0:
-
-        quality_score = (
-            (total_cells - missing_cells)
-            / total_cells
-        ) * 100
-
-    else:
-
-        quality_score = 100.0
-
-    # ==========================================
+    # ==========================================================
     # ANOMALIES
-    # ==========================================
+    # ==========================================================
 
     total_anomalies = len(anomalies)
 
-    # ==========================================
-    # SEVERITY
-    # ==========================================
+    # ==========================================================
+    # QUALITY SCORE
+    #
+    # Quality consists of:
+    #
+    # 50% Missing-value quality
+    # 50% Anomaly quality
+    #
+    # Missing quality:
+    #
+    #     1 - missing_ratio
+    #
+    # Anomaly quality:
+    #
+    #     1 - anomaly_ratio
+    #
+    # anomaly_ratio:
+    #
+    #     total_anomalies / total_cells
+    #
+    # ==========================================================
+
+    # ----------------------------------------------------------
+    # Missing quality
+    # ----------------------------------------------------------
+
+    if total_cells > 0:
+
+        missing_quality = (
+            1.0 - missing_ratio
+        )
+
+    else:
+
+        missing_quality = 1.0
+
+    # ----------------------------------------------------------
+    # Anomaly quality
+    # ----------------------------------------------------------
+
+    if total_cells > 0:
+
+        anomaly_ratio = (
+            total_anomalies / total_cells
+        )
+
+        anomaly_quality = (
+            1.0 - anomaly_ratio
+        )
+
+    else:
+
+        anomaly_quality = 1.0
+
+    # ----------------------------------------------------------
+    # Final quality score
+    # ----------------------------------------------------------
+
+    quality_score = (
+        0.5 * missing_quality
+        +
+        0.5 * anomaly_quality
+    ) * 100
+
+    # ----------------------------------------------------------
+    # Keep score inside [0, 100]
+    # ----------------------------------------------------------
+
+    quality_score = max(
+        0.0,
+        min(100.0, quality_score)
+    )
+
+    # ==========================================================
+    # COUNTERS
+    # ==========================================================
 
     severity_counter = Counter()
 
-    # ==========================================
-    # ISSUE TYPES
-    # ==========================================
-
     issue_counter = Counter()
-
-    # ==========================================
-    # COLUMN ISSUES
-    # ==========================================
 
     column_issues = {}
 
+    # ==========================================================
+    # ANALYZE ANOMALIES
+    # ==========================================================
+
     for anomaly in anomalies:
 
-        column = anomaly.get(
-            "column"
-        )
+        # ======================================================
+        # SUPPORT DICT
+        # ======================================================
 
-        severity = anomaly.get(
-            "severity"
-        )
+        if isinstance(anomaly, dict):
+
+            column = anomaly.get(
+                "column"
+            )
+
+            severity = anomaly.get(
+                "severity"
+            )
+
+            anomaly_types = anomaly.get(
+                "anomaly_types",
+                []
+            )
+
+            # --------------------------------------------------
+            # Support singular anomaly_type
+            # --------------------------------------------------
+
+            if not anomaly_types:
+
+                anomaly_type = anomaly.get(
+                    "anomaly_type"
+                )
+
+                if anomaly_type:
+
+                    anomaly_types = [
+                        anomaly_type
+                    ]
+
+        # ======================================================
+        # SUPPORT DATACLASS / OBJECT
+        # ======================================================
+
+        else:
+
+            column = getattr(
+                anomaly,
+                "column",
+                None
+            )
+
+            severity = getattr(
+                anomaly,
+                "severity",
+                None
+            )
+
+            anomaly_types = getattr(
+                anomaly,
+                "anomaly_types",
+                []
+            )
+
+            # --------------------------------------------------
+            # Support AnomalyRecord
+            # --------------------------------------------------
+
+            if not anomaly_types:
+
+                anomaly_type = getattr(
+                    anomaly,
+                    "anomaly_type",
+                    None
+                )
+
+                if anomaly_type:
+
+                    anomaly_types = [
+                        anomaly_type
+                    ]
+
+        # ======================================================
+        # SEVERITY COUNT
+        # ======================================================
 
         if severity:
 
@@ -92,10 +219,9 @@ def build_quality_report(
                 severity
             ] += 1
 
-        anomaly_types = anomaly.get(
-            "anomaly_types",
-            []
-        )
+        # ======================================================
+        # ISSUE TYPE COUNT
+        # ======================================================
 
         for anomaly_type in anomaly_types:
 
@@ -103,21 +229,40 @@ def build_quality_report(
                 anomaly_type
             ] += 1
 
-        # --------------------------------------
-        # Column
-        # --------------------------------------
+        # ======================================================
+        # IGNORE ANOMALIES WITHOUT COLUMN
+        # ======================================================
+
+        if column is None:
+
+            continue
+
+        # ======================================================
+        # INITIALIZE COLUMN
+        # ======================================================
 
         if column not in column_issues:
 
             column_issues[column] = {
+
                 "anomalies": 0,
+
                 "types": Counter(),
+
                 "severities": Counter(),
             }
+
+        # ======================================================
+        # COLUMN ANOMALY COUNT
+        # ======================================================
 
         column_issues[column][
             "anomalies"
         ] += 1
+
+        # ======================================================
+        # COLUMN ISSUE TYPES
+        # ======================================================
 
         for anomaly_type in anomaly_types:
 
@@ -125,15 +270,19 @@ def build_quality_report(
                 "types"
             ][anomaly_type] += 1
 
+        # ======================================================
+        # COLUMN SEVERITIES
+        # ======================================================
+
         if severity:
 
             column_issues[column][
                 "severities"
             ][severity] += 1
 
-    # ==========================================
-    # CLEANING
-    # ==========================================
+    # ==========================================================
+    # CLEANING STATISTICS
+    # ==========================================================
 
     cleaned_count = 0
 
@@ -143,25 +292,61 @@ def build_quality_report(
 
     for result in cleaning_results:
 
+        # ------------------------------------------------------
+        # Safety
+        # ------------------------------------------------------
+
+        if not isinstance(result, dict):
+
+            continue
+
         action = result.get(
             "action"
         )
 
-        if action == "replace_with_missing":
+        status = result.get(
+            "status"
+        )
+
+        # ======================================================
+        # CLEANED
+        # ======================================================
+
+        if (
+            action == "replace_with_missing"
+            or status == "cleaned"
+        ):
 
             cleaned_count += 1
 
-        elif action == "review":
+        # ======================================================
+        # REVIEW
+        # ======================================================
+
+        elif (
+            action == "review"
+            or status == "review_required"
+        ):
 
             review_count += 1
 
-        elif action == "skip":
+        # ======================================================
+        # SKIPPED
+        # ======================================================
+
+        elif (
+            action == "skip"
+            or status == "skipped"
+        ):
 
             skipped_count += 1
 
-    # ==========================================
-    # NORMALIZE COLUMN COUNTERS
-    # ==========================================
+    # ==========================================================
+    # NORMALIZE COLUMN ISSUES
+    #
+    # Counter is converted to normal dict so the result can be
+    # serialized to JSON later by the web API.
+    # ==========================================================
 
     normalized_column_issues = {}
 
@@ -169,7 +354,9 @@ def build_quality_report(
 
         normalized_column_issues[column] = {
 
-            "anomalies": data["anomalies"],
+            "anomalies": data[
+                "anomalies"
+            ],
 
             "types": dict(
                 data["types"]
@@ -180,9 +367,9 @@ def build_quality_report(
             ),
         }
 
-    # ==========================================
-    # RETURN REPORT
-    # ==========================================
+    # ==========================================================
+    # RETURN QUALITY REPORT
+    # ==========================================================
 
     return QualityReport(
 

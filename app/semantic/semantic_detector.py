@@ -4,11 +4,85 @@ from app.profiling.models import ColumnProfile
 
 
 SEMANTIC_RULES = {
-
     "AGE": [
         "age",
         "age_years",
         "years_old",
+        "age_year",
+    ],
+
+    "PERSON_NAME": [
+        "name",
+        "full_name",
+        "fullname",
+        "first_name",
+        "last_name",
+        "middle_name",
+        "given_name",
+        "surname",
+        "customer_name",
+        "user_name",
+        "employee_name",
+        "person_name",
+    ],
+
+    "EMAIL": [
+        "email",
+        "email_address",
+        "mail",
+        "email_id",
+        "e_mail",
+    ],
+
+    "PHONE": [
+        "phone",
+        "mobile",
+        "phone_number",
+        "mobile_number",
+        "contact_number",
+        "telephone",
+        "telephone_number",
+        "tel",
+        "phone_no",
+        "mobile_no",
+    ],
+
+    "ADDRESS": [
+        "address",
+        "home_address",
+        "street_address",
+        "postal_address",
+        "mailing_address",
+        "billing_address",
+        "shipping_address",
+        "residential_address",
+    ],
+
+    "DATE": [
+        "date",
+        "birth_date",
+        "birthday",
+        "dob",
+        "date_of_birth",
+        "hire_date",
+        "start_date",
+        "end_date",
+        "created_date",
+        "updated_date",
+        "registration_date",
+    ],
+
+    "DATETIME": [
+        "datetime",
+        "date_time",
+        "timestamp",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "event_time",
+        "login_time",
+        "created_datetime",
+        "updated_datetime",
     ],
 
     "MONEY": [
@@ -19,37 +93,122 @@ SEMANTIC_RULES = {
         "price",
         "cost",
         "amount",
+        "revenue",
+        "profit",
+        "expense",
+        "payment",
+        "balance",
+        "budget",
+        "fee",
+        "total",
     ],
 
-    "PHONE": [
-        "phone",
-        "mobile",
-        "phone_number",
-        "mobile_number",
-        "contact_number",
-    ],
-
-    "EMAIL": [
-        "email",
-        "email_address",
-        "mail",
-    ],
-
-    "DATE": [
-        "date",
-        "birth_date",
-        "birthday",
-        "dob",
-        "date_of_birth",
+    "PERCENTAGE": [
+        "percent",
+        "percentage",
+        "rate",
+        "ratio",
+        "margin",
+        "growth_rate",
+        "discount",
+        "discount_rate",
+        "tax_rate",
+        "completion_rate",
+        "success_rate",
     ],
 
     "ID": [
         "id",
         "identifier",
         "code",
+        "key",
+        "uuid",
+        "guid",
+        "record_id",
+        "user_id",
+        "customer_id",
+        "employee_id",
+        "product_id",
+        "order_id",
+        "transaction_id",
+        "account_id",
+    ],
+
+    "CATEGORY": [
+        "category",
+        "type",
+        "group",
+        "class",
+        "classification",
+        "segment",
+        "department",
+        "region",
+        "country",
+        "city",
+        "gender",
+        "status",
+    ],
+
+    "ORDINAL": [
+        "rank",
+        "ranking",
+        "rating",
+        "level",
+        "grade",
+        "priority",
+        "stage",
+        "tier",
+        "position",
+        "order",
+    ],
+
+    "BOOLEAN": [
+        "is_active",
+        "is_valid",
+        "is_verified",
+        "is_deleted",
+        "is_enabled",
+        "is_available",
+        "is_completed",
+        "is_success",
+        "has_account",
+        "has_email",
+        "has_phone",
+        "active",
+        "verified",
+        "enabled",
+        "deleted",
+    ],
+
+    "TEXT": [
+        "text",
+        "description",
+        "comment",
+        "comments",
+        "note",
+        "notes",
+        "remark",
+        "remarks",
+        "content",
+        "message",
+        "review",
+        "feedback",
+        "bio",
+        "summary",
+    ],
+
+    "NUMERIC": [
+        "number",
+        "numeric",
+        "value",
+        "quantity",
+        "count",
+        "score",
+        "amount_value",
+        "measurement",
+        "measure",
     ],
 }
-
 
 def normalize_column_name(
     name: str
@@ -223,3 +382,25 @@ def detect_semantic_type(
         evidences[best_type]
     )
     
+    
+def detect_semantic_types(
+    profiles: list[ColumnProfile],
+) -> list[ColumnProfile]:
+
+    updated_profiles = []
+
+    for profile in profiles:
+
+        (
+            semantic_type,
+            confidence,
+            evidence,
+        ) = detect_semantic_type(profile)
+
+        profile.semantic_type = semantic_type
+        profile.semantic_confidence = confidence
+        profile.semantic_evidence = evidence
+
+        updated_profiles.append(profile)
+
+    return updated_profiles
