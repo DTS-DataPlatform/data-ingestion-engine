@@ -11,6 +11,13 @@ from app.anomaly.hybrid_detector import (
 )
 from app.anomaly.aggregator import aggregate_anomalies
 from app.anomaly.deduplicator import ( deduplicate_anomalies )
+from app.cleaning.recommender import (
+    recommend_cleaning
+)
+from app.cleaning.executor import execute_cleaning
+from app.quality.report import (
+    build_quality_report
+)
 
 import pandas as pd
 
@@ -140,7 +147,117 @@ final_anomalies = deduplicate_anomalies(
 #             f"  - {reason}"
 #         )
 
-print(f"RULE: {len(anomalies)}")
-print(f"STATISTICAL: {len(statistical_anomalies)}")
-print(f"HYBRID: {len(hybrid_anomalies)}")
-print(f"FINAL: {len(final_anomalies)}")
+recommendations = []
+
+for anomaly in final_anomalies:
+
+    recommendation = recommend_cleaning(
+        anomaly
+    )
+
+    recommendations.append(
+        recommendation
+    )
+cleaned_df, cleaning_log = execute_cleaning(
+    table.dataframe,
+    recommendations,
+)
+
+quality_report = build_quality_report(
+    dataframe=cleaned_df,
+    anomalies=final_anomalies,
+    cleaning_results=cleaning_log,
+)
+print("\n")
+print("=" * 60)
+print("DATA QUALITY REPORT")
+print("=" * 60)
+
+print(
+    f"Rows: "
+    f"{quality_report.rows}"
+)
+
+print(
+    f"Columns: "
+    f"{quality_report.columns}"
+)
+
+print(
+    f"Total cells: "
+    f"{quality_report.total_cells}"
+)
+
+print(
+    f"Missing cells: "
+    f"{quality_report.missing_cells}"
+)
+
+print(
+    f"Missing ratio: "
+    f"{quality_report.missing_ratio:.3f}"
+)
+
+print(
+    f"Quality score: "
+    f"{quality_report.quality_score:.2f}"
+)
+
+print("\nANOMALIES")
+
+print(
+    f"Total: "
+    f"{quality_report.total_anomalies}"
+)
+
+print(
+    f"Severity: "
+    f"{quality_report.severity_counts}"
+)
+
+print(
+    f"Issue types: "
+    f"{quality_report.issue_counts}"
+)
+
+print("\nCLEANING")
+
+print(
+    f"Cleaned: "
+    f"{quality_report.cleaned_count}"
+)
+
+print(
+    f"Requires review: "
+    f"{quality_report.review_count}"
+)
+
+print(
+    f"Skipped: "
+    f"{quality_report.skipped_count}"
+)
+
+print("\nCOLUMN ISSUES")
+
+for column, info in (
+    quality_report.column_issues.items()
+):
+
+    print(
+        f"\n{column}"
+    )
+
+    print(
+        f"  Anomalies: "
+        f"{info['anomalies']}"
+    )
+
+    print(
+        f"  Types: "
+        f"{info['types']}"
+    )
+
+    print(
+        f"  Severities: "
+        f"{info['severities']}"
+    )
