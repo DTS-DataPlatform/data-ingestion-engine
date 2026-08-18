@@ -54,3 +54,63 @@ class QualityReport:
     column_issues: dict[str, dict] = field(
         default_factory=dict
     )
+    
+@dataclass
+class QualitySnapshot:
+
+    # ==========================================
+    # DATASET
+    # ==========================================
+
+    rows: int
+    columns: int
+    total_cells: int
+
+    # ==========================================
+    # MISSING
+    # ==========================================
+
+    missing_cells: int
+    missing_ratio: float
+
+    # ==========================================
+    # ANOMALIES
+    # ==========================================
+
+    anomaly_count: int
+
+    # ==========================================
+    # QUALITY
+    # ==========================================
+
+    quality_score: float
+
+
+@dataclass
+class QualityComparison:
+
+    # ==========================================
+    # BEFORE
+    # ==========================================
+
+    before: QualitySnapshot
+
+    # ==========================================
+    # AFTER
+    # ==========================================
+
+    after: QualitySnapshot
+
+    # ==========================================
+    # IMPROVEMENT
+    # ==========================================
+
+    missing_reduction: int
+
+    missing_ratio_reduction: float
+
+    anomaly_reduction: int
+
+    quality_score_improvement: float
+
+    quality_improved: bool

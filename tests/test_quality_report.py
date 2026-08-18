@@ -48,8 +48,11 @@ def test_report_contains_missing_information():
     )
 
     assert report.quality_score == pytest.approx(
-        (4 / 6) * 100
+    100 * (
+        0.5 * (4 / 6)
+        + 0.5 * 1.0
     )
+)
 
 
 def test_report_contains_anomaly_count():
