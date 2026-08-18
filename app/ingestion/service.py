@@ -8,6 +8,7 @@ from .json_reader import read_json_file
 from .parquet_reader import read_parquet_file
 from .detector import infer_schema
 from .models import DatasetObject
+from app.core.table import UnifiedTable
 
 
 def ingest_file(file_path: str, sheet_name: str | None = None):
@@ -53,5 +54,11 @@ def ingest_file(file_path: str, sheet_name: str | None = None):
         storage_path=str(path),
         created_at=datetime.now(),
     )
+    
+    table = UnifiedTable(
+    dataframe=df,
+    source_file=path.name,
+    file_type=extension.replace(".", "")
+)
 
-    return dataset, df
+    return dataset, table
